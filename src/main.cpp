@@ -113,11 +113,14 @@ void setup()
 
     WiFiManager wm;
 
+    sett.password[39] = '\0';
+    sett.email[69] = '\0';
+
     IntParameter codigo_pareamento("int", "Código de Pareamento", sett.i);
     wm.addParameter(&codigo_pareamento);
 
     // Adicionar parâmetros de senha e email
-    WiFiManagerParameter email_param("email", "Email", sett.email, 40);
+    WiFiManagerParameter email_param("email", "Email", sett.email, 70);
     WiFiManagerParameter senha_param("senha", "Senha", sett.password, 40, "type='password'");
     wm.addParameter(&email_param);
     wm.addParameter(&senha_param);
