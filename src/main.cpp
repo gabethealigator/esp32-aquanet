@@ -1,9 +1,20 @@
 #include <WiFiManager.h> // https://github.com/tzapu/WiFiManager
 #include <Arduino.h>
 #include <EEPROM.h>
+#include <addons/RTDBHelper.h>
+#include <Firebase_ESP_Client.h>
 
+// Define o pino de SETUP e o LED
 #define SETUP_PIN 0
 #define LED 2
+
+// Define credenciais e objetos do firebase
+const char *DATABASE_URL = getenv("DATABASE_URL");
+const char *API_KEY = getenv("FIREBASE_API_KEY");
+
+FirebaseData fbdo;
+FirebaseAuth auth;
+FirebaseConfig config;
 
 class IPAddressParameter : public WiFiManagerParameter
 {
@@ -52,10 +63,9 @@ public:
 
 struct Settings
 {
-  float f;
   int i;
-  char s[20];
-  uint32_t ip;
+  char password[20];
+  char email[80];
 } sett;
 
 bool connected = false;
@@ -96,25 +106,36 @@ void setup()
     for (int i = 0; i < 2; i++)
     {
       digitalWrite(LED, HIGH);
-      delay(500);
+      delay(300);
       digitalWrite(LED, LOW);
-      delay(500);
+      delay(300);
     }
 
     WiFiManager wm;
 
-    sett.s[19] = '\0'; // adiciona terminador nulo no final para evitar overflow
     IntParameter codigo_pareamento("int", "Código de Pareamento", sett.i);
-
     wm.addParameter(&codigo_pareamento);
+
+    // Adicionar parâmetros de senha e email
+    WiFiManagerParameter email_param("email", "Email", sett.email, 40);
+    WiFiManagerParameter senha_param("senha", "Senha", sett.password, 40, "type='password'");
+    wm.addParameter(&email_param);
+    wm.addParameter(&senha_param);
 
     // Parâmetros de SSID e senha já incluídos
     wm.startConfigPortal();
 
+    // Adiciona os valores dos parâmetros
     sett.i = codigo_pareamento.getValue();
+    strncpy(sett.email, email_param.getValue(), sizeof(sett.email) - 1);
+    strncpy(sett.password, senha_param.getValue(), sizeof(sett.password) - 1);
 
     Serial.print("Código de pareamento: ");
     Serial.println(sett.i, DEC);
+    Serial.print("Email: ");
+    Serial.println(sett.email);
+    Serial.print("Senha: ");
+    Serial.println(sett.password);
 
     EEPROM.put(0, sett);
     if (EEPROM.commit())
@@ -135,7 +156,7 @@ void setup()
   }
   else
   {
-    Serial.println("WORK");
+    Serial.println("Setup is ok, connecting to wifi SSID");
 
     // Conectar ao SSID salvo
     WiFi.begin();
@@ -166,4 +187,8 @@ void loop()
       digitalWrite(LED, LOW);
     }
   }
+
+  Serial.println(sett.i, DEC);
+  Serial.println(sett.email);
+  Serial.println(sett.password);
 }
