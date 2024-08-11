@@ -1,197 +1,135 @@
-#include <WiFiManager.h> // https://github.com/tzapu/WiFiManager
+#include <WiFiManager.h>
 #include <Arduino.h>
 #include <EEPROM.h>
 #include <addons/RTDBHelper.h>
+#include <addons/TokenHelper.h>
 #include <Firebase_ESP_Client.h>
 
-// Define o pino de SETUP e o LED
+#define API_KEY "AIzaSyBhj3If5etw9wk-QXnNnU0vvRxBKk2syFw"
+#define DATABASE_URL "https://site-aqua-54d76-default-rtdb.firebaseio.com"
+
 #define SETUP_PIN 0
 #define LED 2
 
-// Define credenciais e objetos do firebase
-const char *DATABASE_URL = getenv("DATABASE_URL");
-const char *API_KEY = getenv("FIREBASE_API_KEY");
-
-FirebaseData fbdo;
-FirebaseAuth auth;
-FirebaseConfig config;
-
-class IPAddressParameter : public WiFiManagerParameter
-{
-public:
-  IPAddressParameter(const char *id, const char *placeholder, IPAddress address)
-      : WiFiManagerParameter("")
-  {
-    init(id, placeholder, address.toString().c_str(), 16, "", WFM_LABEL_BEFORE);
-  }
-
-  bool getValue(IPAddress &ip)
-  {
-    return ip.fromString(WiFiManagerParameter::getValue());
-  }
-};
-
-class IntParameter : public WiFiManagerParameter
-{
-public:
-  IntParameter(const char *id, const char *placeholder, long value, const uint8_t length = 10)
-      : WiFiManagerParameter("")
-  {
-    init(id, placeholder, String(value).c_str(), length, "", WFM_LABEL_BEFORE);
-  }
-
-  long getValue()
-  {
-    return String(WiFiManagerParameter::getValue()).toInt();
-  }
-};
-
-class FloatParameter : public WiFiManagerParameter
-{
-public:
-  FloatParameter(const char *id, const char *placeholder, float value, const uint8_t length = 10)
-      : WiFiManagerParameter("")
-  {
-    init(id, placeholder, String(value).c_str(), length, "", WFM_LABEL_BEFORE);
-  }
-
-  float getValue()
-  {
-    return String(WiFiManagerParameter::getValue()).toFloat();
-  }
-};
-
-struct Settings
-{
-  int i;
-  char password[20];
-  char email[80];
-} sett;
-
 bool connected = false;
 unsigned long previousMillis = 0;
-const long interval = 4000; // Intervalo de 4 segundos
+const long interval = 1000;
 
-void setup()
-{
-  WiFi.mode(WIFI_STA); // explicitamente define o modo, esp defaults to STA+AP
-  pinMode(SETUP_PIN, INPUT_PULLUP);
-  pinMode(LED, OUTPUT);
-  Serial.begin(9600);
+class FireBaseManager {
+private:
+    FirebaseData fbdo;
+    FirebaseAuth auth;
+    FirebaseConfig config;
+    bool signupOK = false;
+    unsigned long sendDataPreviousMillis = 0;
 
-  // Delay para pressionar o botão SETUP
-  Serial.println("Pressione o botão de setup");
-  for (int sec = 3; sec > 0; sec--)
-  {
-    Serial.print(sec);
-    Serial.print("..");
-    digitalWrite(LED, HIGH);
-    delay(500);
-    digitalWrite(LED, LOW);
-    delay(500);
-  }
-
-  // Aviso: para exemplo apenas, isso inicializará a memória vazia em suas variáveis
-  // sempre inicialize a memória flash ou adicione alguns bits de checksum
-  EEPROM.begin(512);
-  EEPROM.get(0, sett);
-  Serial.println("Configurações carregadas");
-
-  if (digitalRead(SETUP_PIN) == LOW)
-  {
-    // Botão pressionado
-    Serial.println("SETUP");
-
-    // Piscar o LED duas vezes rapidamente
-    for (int i = 0; i < 2; i++)
-    {
-      digitalWrite(LED, HIGH);
-      delay(300);
-      digitalWrite(LED, LOW);
-      delay(300);
+public:
+    FireBaseManager() {
+        config.api_key = API_KEY;
+        config.database_url = DATABASE_URL;
+        Firebase.begin(&config, &auth);
     }
 
-    WiFiManager wm;
+    void authenticateUser(const String& email, const String& password) {
+        auth.user.email = email;
+        auth.user.password = password;
+        signupOK = Firebase.signUp(&config, &auth, email, password);
 
-    sett.password[39] = '\0';
-    sett.email[69] = '\0';
-
-    IntParameter codigo_pareamento("int", "Código de Pareamento", sett.i);
-    wm.addParameter(&codigo_pareamento);
-
-    // Adicionar parâmetros de senha e email
-    WiFiManagerParameter email_param("email", "Email", sett.email, 70);
-    WiFiManagerParameter senha_param("senha", "Senha", sett.password, 40, "type='password'");
-    wm.addParameter(&email_param);
-    wm.addParameter(&senha_param);
-
-    // Parâmetros de SSID e senha já incluídos
-    wm.startConfigPortal();
-
-    // Adiciona os valores dos parâmetros
-    sett.i = codigo_pareamento.getValue();
-    strncpy(sett.email, email_param.getValue(), sizeof(sett.email) - 1);
-    strncpy(sett.password, senha_param.getValue(), sizeof(sett.password) - 1);
-
-    Serial.print("Código de pareamento: ");
-    Serial.println(sett.i, DEC);
-    Serial.print("Email: ");
-    Serial.println(sett.email);
-    Serial.print("Senha: ");
-    Serial.println(sett.password);
-
-    EEPROM.put(0, sett);
-    if (EEPROM.commit())
-    {
-      Serial.println("Configurações salvas");
-    }
-    else
-    {
-      Serial.println("Erro no EEPROM");
+        if (signupOK) {
+            Serial.println("User authenticated successfully");
+        } else {
+            Serial.println("Failed to authenticate user");
+            Serial.println(fbdo.errorReason());
+        }
     }
 
-    // Após a configuração, tentar conectar ao WiFi
+    void updateData(const String& path, int& data) {
+        if (Firebase.ready() && signupOK && (millis() - sendDataPreviousMillis > 2000 || sendDataPreviousMillis == 0)) {
+            sendDataPreviousMillis = millis();
+            data++;
+            bool result = Firebase.RTDB.setInt(&fbdo, path, data);
+
+            if (result) {
+                Serial.println("Data sent to Firebase");
+            }
+            if (!result) {
+                Serial.println("Failed to send data to Firebase");
+                Serial.println(fbdo.errorReason());
+            }
+        }
+    }
+};
+
+void ConnectToWifi() {
     WiFi.begin();
-    if (WiFi.waitForConnectResult() == WL_CONNECTED)
-    {
-      connected = true;
+    if (WiFi.waitForConnectResult() == WL_CONNECTED) {
+        connected = true;
     }
-  }
-  else
-  {
-    Serial.println("Setup is ok, connecting to wifi SSID");
 
-    // Conectar ao SSID salvo
-    WiFi.begin();
-    if (WiFi.waitForConnectResult() == WL_CONNECTED)
-    {
-      connected = true;
+    if (WiFi.waitForConnectResult() != WL_CONNECTED) {
+        connected = false;
     }
-  }
 }
 
-void loop()
-{
-  WiFi.begin();
-  // Verifica o estado da conexão WiFi
-  if (WiFi.status() != WL_CONNECTED)
-  {
-    connected = false;
-  }
-  // Pisca o LED se conectado
-  if (connected)
-  {
-    unsigned long currentMillis = millis();
-    if (currentMillis - previousMillis >= interval)
-    {
-      previousMillis = currentMillis;
-      digitalWrite(LED, HIGH);
-      delay(100);
-      digitalWrite(LED, LOW);
-    }
-  }
+FireBaseManager firebaseManager;
 
-  Serial.println(sett.i, DEC);
-  Serial.println(sett.email);
-  Serial.println(sett.password);
+void setup() {
+    // Setup serial communication and wifi mode to station mode (STA)   
+    Serial.begin(9600);
+    WiFi.mode(WIFI_STA);
+    pinMode(LED, OUTPUT);
+
+    // Time to enter setup mode
+    Serial.println("Press the button to enter setup mode");
+    for (int i = 3; i > 0; i--) {
+        Serial.print(i);
+        Serial.print("...");
+        digitalWrite(LED, HIGH);
+        delay(500);
+        digitalWrite(LED, LOW);
+        delay(500);
+    }
+
+    // Check if the setup button is pressed
+    if (digitalRead(SETUP_PIN) == LOW) {
+        Serial.println("Entering setup mode");
+
+        for (int i = 0; i < 2; i++) {
+            digitalWrite(LED, HIGH);
+            delay(300);
+            digitalWrite(LED, LOW);
+            delay(300);
+        }
+
+        // Start the wifi manager to configure the wifi
+        WiFiManager wm;
+
+        wm.startConfigPortal("AquaNet");
+    } 
+    if (digitalRead(SETUP_PIN) == HIGH) {
+        Serial.println("Starting the device");
+        ConnectToWifi();
+        String email = "";
+        String password = "";
+        firebaseManager.authenticateUser(email, password);
+    }
+
+    Serial.printf("Firebase Client v%s\n\n", FIREBASE_CLIENT_VERSION);
+}
+
+int TEMP_TEST = 0;
+
+void loop() {
+    ConnectToWifi();
+    if (connected) {
+        unsigned long currentMillis = millis();
+        if (currentMillis - previousMillis >= interval) {
+            previousMillis = currentMillis;
+            digitalWrite(LED, HIGH);
+            delay(100);
+            digitalWrite(LED, LOW);
+        }
+    }
+
+    firebaseManager.updateData("UserData/4422/TEMP", TEMP_TEST);
 }
