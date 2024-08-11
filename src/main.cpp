@@ -7,9 +7,15 @@
 
 #define API_KEY ""
 #define DATABASE_URL ""
+#define USER_EMAIL ""
+#define USER_PASSWORD ""
 
 #define SETUP_PIN 0
 #define LED 2
+
+FirebaseData fbdo;
+FirebaseAuth auth;
+FirebaseConfig config;
 
 bool connected = false;
 unsigned long previousMillis = 0;
@@ -17,46 +23,13 @@ const long interval = 1000;
 
 class FireBaseManager {
 private:
-    FirebaseData fbdo;
-    FirebaseAuth auth;
-    FirebaseConfig config;
-    bool signupOK = false;
     unsigned long sendDataPreviousMillis = 0;
+    bool signupOK = false;
 
 public:
-    FireBaseManager() {
-        config.api_key = API_KEY;
-        config.database_url = DATABASE_URL;
-        Firebase.begin(&config, &auth);
-    }
-
-    void authenticateUser(const String& email, const String& password) {
-        auth.user.email = email;
-        auth.user.password = password;
-        signupOK = Firebase.signUp(&config, &auth, email, password);
-
-        if (signupOK) {
-            Serial.println("User authenticated successfully");
-        } else {
-            Serial.println("Failed to authenticate user");
-            Serial.println(fbdo.errorReason());
-        }
-    }
-
-    void updateData(const String& path, int& data) {
-        if (Firebase.ready() && signupOK && (millis() - sendDataPreviousMillis > 2000 || sendDataPreviousMillis == 0)) {
-            sendDataPreviousMillis = millis();
-            data++;
-            bool result = Firebase.RTDB.setInt(&fbdo, path, data);
-
-            if (result) {
-                Serial.println("Data sent to Firebase");
-            }
-            if (!result) {
-                Serial.println("Failed to send data to Firebase");
-                Serial.println(fbdo.errorReason());
-            }
-        }
+    bool checkAuthCredentials() {
+        signupOK = Firebase.signUp(&config, &auth, USER_EMAIL, USER_PASSWORD);
+        return true;
     }
 };
 
@@ -109,9 +82,26 @@ void setup() {
     if (digitalRead(SETUP_PIN) == HIGH) {
         Serial.println("Starting the device");
         ConnectToWifi();
-        String email = "";
-        String password = "";
-        firebaseManager.authenticateUser(email, password);
+
+        config.api_key = API_KEY;
+        config.database_url = DATABASE_URL;
+        auth.user.email = USER_EMAIL;
+        auth.user.password = USER_PASSWORD;
+
+        config.token_status_callback = tokenStatusCallback; // see addons/TokenHelper.h
+        Firebase.begin(&config, &auth);
+        Firebase.reconnectNetwork(true);
+
+        fbdo.setBSSLBufferSize(4096, 1024);
+        fbdo.setResponseSize(4096);
+        
+        bool checkAuthCredentials = firebaseManager.checkAuthCredentials();
+        if (checkAuthCredentials) {
+          Serial.println("Auth credentials are OK");
+        }
+        if (!checkAuthCredentials) {
+          Serial.println("Auth credentials are not OK");
+        }
     }
 
     Serial.printf("Firebase Client v%s\n\n", FIREBASE_CLIENT_VERSION);
@@ -130,6 +120,4 @@ void loop() {
             digitalWrite(LED, LOW);
         }
     }
-
-    firebaseManager.updateData("UserData/4422/TEMP", TEMP_TEST);
 }
