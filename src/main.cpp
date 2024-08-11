@@ -5,8 +5,8 @@
 #include <addons/TokenHelper.h>
 #include <Firebase_ESP_Client.h>
 
-#define API_KEY "AIzaSyBhj3If5etw9wk-QXnNnU0vvRxBKk2syFw"
-#define DATABASE_URL "https://site-aqua-54d76-default-rtdb.firebaseio.com"
+#define API_KEY ""
+#define DATABASE_URL ""
 
 #define SETUP_PIN 0
 #define LED 2
