@@ -5,20 +5,22 @@
 #include <addons/TokenHelper.h>
 #include <Firebase_ESP_Client.h>
 
-#define API_KEY "APIKEY"
-#define DATABASE_URL "DATABASEURL"
+#define API_KEY "AIzaSyBhj3If5etw9wk-QXnNnU0vvRxBKk2syFw"
+#define DATABASE_URL "https://site-aqua-54d76-default-rtdb.firebaseio.com"
 
 #define SETUP_PIN 0
 #define LED 2
 
 FirebaseData fbdo;
+FirebaseData fbdoStream;
 FirebaseAuth auth;
 FirebaseConfig config;
 
 bool connected = false;
 unsigned long previousMillis = 0;
-unsigned long dataMillis = 0;
-const long interval = 1000;
+unsigned long lastFirebaseOperation = 0;
+const unsigned long interval = 1000;
+const unsigned long firebaseInterval = 5000;
 int count = 0;
 
 class FireBaseManager {
@@ -28,35 +30,35 @@ private:
 public:
     bool checkAuthCredentials(String email, String password) {
         signupOK = Firebase.signUp(&config, &auth, email.c_str(), password.c_str());
-        return true;
+        return signupOK;
     }
 };
 
 void ConnectToWifi() {
-    WiFi.begin();
-    if (WiFi.waitForConnectResult() == WL_CONNECTED) {
-        connected = true;
-    }
-
-    if (WiFi.waitForConnectResult() != WL_CONNECTED) {
-        connected = false;
+    if (WiFi.status() != WL_CONNECTED) {
+        WiFi.begin();
+        if (WiFi.waitForConnectResult() == WL_CONNECTED) {
+            connected = true;
+            Serial.println("Wi-Fi connected");
+        } else {
+            connected = false;
+            Serial.println("Wi-Fi connection failed");
+        }
     }
 }
 
 struct Settings {
-  char email[60];
-  char password[20];
+    char email[60];
+    char password[20];
 } settings;
 
 FireBaseManager firebaseManager;
 
 void setup() {
-    // Setup serial communication and wifi mode to station mode (STA)   
     Serial.begin(9600);
     WiFi.mode(WIFI_STA);
     pinMode(LED, OUTPUT);
 
-    // Time to enter setup mode
     Serial.println("Press the button to enter setup mode");
     for (int i = 3; i > 0; i--) {
         Serial.print(i);
@@ -69,9 +71,8 @@ void setup() {
 
     EEPROM.begin(512);
     EEPROM.get(0, settings);
-    Serial.println("Settings loaded from EEPROM"); 
+    Serial.println("Settings loaded from EEPROM");
 
-    // Check if the setup button is pressed
     if (digitalRead(SETUP_PIN) == LOW) {
         Serial.println("Entering setup mode");
 
@@ -82,7 +83,6 @@ void setup() {
             delay(300);
         }
 
-        // Start the wifi manager to configure the wifi
         WiFiManager wm;
 
         settings.password[19] = '\0';
@@ -100,17 +100,13 @@ void setup() {
         strcpy(settings.password, password_parameter.getValue());
 
         EEPROM.put(0, settings);
-        if (EEPROM.commit())
-        {
-          Serial.println("Settings saved to EEPROM");
-        }
-        else
-        {
-          Serial.println("Error saving settings to EEPROM");
+        if (EEPROM.commit()) {
+            Serial.println("Settings saved to EEPROM");
+        } else {
+            Serial.println("Error saving settings to EEPROM");
         }
 
-    } 
-    if (digitalRead(SETUP_PIN) == HIGH) {
+    } else {
         Serial.println("Starting the device");
         ConnectToWifi();
 
@@ -119,20 +115,21 @@ void setup() {
         auth.user.email = settings.email;
         auth.user.password = settings.password;
 
-        config.token_status_callback = tokenStatusCallback; // see addons/TokenHelper.h
+        config.token_status_callback = tokenStatusCallback;
         Firebase.begin(&config, &auth);
         Firebase.reconnectNetwork(true);
 
         fbdo.setBSSLBufferSize(4096, 1024);
         fbdo.setResponseSize(4096);
-        
+
         bool checkAuthCredentials = firebaseManager.checkAuthCredentials(settings.email, settings.password);
         if (checkAuthCredentials) {
-          Serial.println("Auth credentials are OK");
+            Serial.println("Auth credentials are OK");
+        } else {
+            Serial.println("Auth credentials are not OK");
         }
-        if (!checkAuthCredentials) {
-          Serial.println("Auth credentials are not OK");
-        }
+
+        Firebase.RTDB.beginStream(&fbdoStream, "/UsersData/4422");
     }
 
     Serial.printf("Firebase Client v%s\n\n", FIREBASE_CLIENT_VERSION);
@@ -141,21 +138,39 @@ void setup() {
 }
 
 void loop() {
-    ConnectToWifi();
-    if (connected) {
-        unsigned long currentMillis = millis();
-        if (currentMillis - previousMillis >= interval) {
-            previousMillis = currentMillis;
-            digitalWrite(LED, HIGH);
-            delay(100);
-            digitalWrite(LED, LOW);
+    unsigned long currentMillis = millis();
+
+    if (WiFi.status() != WL_CONNECTED) {
+        ConnectToWifi();
+    }
+
+    if (currentMillis - previousMillis >= interval) {
+        previousMillis = currentMillis;
+        digitalWrite(LED, !digitalRead(LED));
+    }
+
+    if (Firebase.ready() && currentMillis - lastFirebaseOperation >= firebaseInterval) {
+        lastFirebaseOperation = currentMillis;
+
+        FirebaseJson json;
+        json.set("TEMP", count++);
+        json.set("timestamp", currentMillis);
+
+        String path = "/UsersData/4422";
+        if (Firebase.RTDB.setJSON(&fbdo, path, &json)) {
+            Serial.println("Data sent successfully");
+        } else {
+            Serial.printf("Error sending data: %s\n", fbdo.errorReason().c_str());
         }
     }
-    // TODO: Add the pairing code logic
-    if (millis() - dataMillis > 5000 && Firebase.ready())
-    {
-        dataMillis = millis();
-        String path = "/UsersData/4422/TEMP";
-        Serial.printf("Set int... %s\n", Firebase.RTDB.setInt(&fbdo, path, count++) ? "ok" : fbdo.errorReason().c_str());
+
+    if (Firebase.ready() && Firebase.RTDB.readStream(&fbdoStream)) {
+        if (fbdoStream.streamAvailable()) {
+            String path = fbdoStream.streamPath();
+            String data = fbdoStream.stringData();
+            Serial.printf("Stream data available at path: %s, data: %s\n", path.c_str(), data.c_str());
+        }
     }
+
+    yield();
 }
