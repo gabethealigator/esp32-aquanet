@@ -40,8 +40,8 @@ void ConnectToWifi() {
         if (WiFi.waitForConnectResult() == WL_CONNECTED) {
             connected = true;
             Serial.println("Wi-Fi connected");
-        } else {
-            connected = false;
+        }   
+        if (WiFi.status() != WL_CONNECTED) {
             Serial.println("Wi-Fi connection failed");
         }
     }
@@ -50,6 +50,7 @@ void ConnectToWifi() {
 struct Settings {
     char email[60];
     char password[20];
+    char pairingCode[4];
 } settings;
 
 FireBaseManager firebaseManager;
@@ -90,51 +91,56 @@ void setup() {
 
         WiFiManagerParameter email_parameter("email", "Email", settings.email, 60);
         WiFiManagerParameter password_parameter("password", "Password", settings.password, 20, "type='password'");
+        WiFiManagerParameter pairingCode_parameter("pairingCode", "Pairing Code", settings.pairingCode, 4, "type='number'");
 
         wm.addParameter(&email_parameter);
         wm.addParameter(&password_parameter);
+        wm.addParameter(&pairingCode_parameter);
 
         wm.startConfigPortal("AquaNet");
 
         strcpy(settings.email, email_parameter.getValue());
         strcpy(settings.password, password_parameter.getValue());
+        strcpy(settings.pairingCode, pairingCode_parameter.getValue());
 
         EEPROM.put(0, settings);
         if (EEPROM.commit()) {
             Serial.println("Settings saved to EEPROM");
-        } else {
+        } 
+        if (!EEPROM.commit()) {
             Serial.println("Error saving settings to EEPROM");
         }
+    } 
 
-    } else {
-        Serial.println("Starting the device");
-        ConnectToWifi();
+    Serial.println("Starting the device");
+    ConnectToWifi();
 
-        config.api_key = API_KEY;
-        config.database_url = DATABASE_URL;
-        auth.user.email = settings.email;
-        auth.user.password = settings.password;
+    config.api_key = API_KEY;
+    config.database_url = DATABASE_URL;
+    auth.user.email = settings.email;
+    auth.user.password = settings.password;
 
-        config.token_status_callback = tokenStatusCallback;
-        Firebase.begin(&config, &auth);
-        Firebase.reconnectNetwork(true);
+    config.token_status_callback = tokenStatusCallback;
+    Firebase.begin(&config, &auth);
+    Firebase.reconnectNetwork(true);
 
-        fbdo.setBSSLBufferSize(4096, 1024);
-        fbdo.setResponseSize(4096);
+    fbdo.setBSSLBufferSize(4096, 1024);
+    fbdo.setResponseSize(4096);
 
-        bool checkAuthCredentials = firebaseManager.checkAuthCredentials(settings.email, settings.password);
-        if (checkAuthCredentials) {
-            Serial.println("Auth credentials are OK");
-        } else {
-            Serial.println("Auth credentials are not OK");
-        }
-
-        Firebase.RTDB.beginStream(&fbdoStream, "/UsersData/4422");
+    bool checkAuthCredentials = firebaseManager.checkAuthCredentials(settings.email, settings.password);
+    if (checkAuthCredentials) {
+        Serial.println("Auth credentials are OK");
     }
+    if (!checkAuthCredentials) {
+        Serial.println("Auth credentials are not OK");
+    }
+
+    Firebase.RTDB.beginStream(&fbdoStream, "/UsersData/" + String(settings.pairingCode));
 
     Serial.printf("Firebase Client v%s\n\n", FIREBASE_CLIENT_VERSION);
     Serial.println("Email: " + String(settings.email));
     Serial.println("Password: " + String(settings.password));
+    Serial.println("Pairing Code: " + String(settings.pairingCode));
 }
 
 void loop() {
@@ -154,12 +160,15 @@ void loop() {
 
         FirebaseJson json;
         json.set("TEMP", count++);
+        json.set("PH", count++);
+        json.set("LEVEL", count++);
         json.set("timestamp", currentMillis);
 
-        String path = "/UsersData/4422";
+        String path = "/UsersData/" + String(settings.pairingCode);
         if (Firebase.RTDB.setJSON(&fbdo, path, &json)) {
             Serial.println("Data sent successfully");
-        } else {
+        }
+        if (!Firebase.RTDB.setJSON(&fbdo, path, &json)) {
             Serial.printf("Error sending data: %s\n", fbdo.errorReason().c_str());
         }
     }
