@@ -4,6 +4,7 @@
 #include <addons/RTDBHelper.h>
 #include <addons/TokenHelper.h>
 #include <Firebase_ESP_Client.h>
+#include <random>
 
 #define API_KEY "AIzaSyBhj3If5etw9wk-QXnNnU0vvRxBKk2syFw"
 #define DATABASE_URL "https://site-aqua-54d76-default-rtdb.firebaseio.com"
@@ -16,12 +17,13 @@ FirebaseData fbdoStream;
 FirebaseAuth auth;
 FirebaseConfig config;
 
+int count = 0;
 bool connected = false;
 unsigned long previousMillis = 0;
 unsigned long lastFirebaseOperation = 0;
 const unsigned long interval = 1000;
 const unsigned long firebaseInterval = 5000;
-int count = 0;
+const char* customHtmlHeader = "<style>#pairing_code { text-align: center; font-size: 3rem; border: none; padding: 15px; width: 100%; box-sizing: border-box; } </style>";
 
 class FireBaseManager {
 private:
@@ -47,10 +49,19 @@ void ConnectToWifi() {
     }
 }
 
+String PairingCodeGenerator() {
+    std::random_device rd;  
+    std::mt19937 gen(rd()); 
+    std::uniform_int_distribution<> dis(1000, 9999); 
+
+    int code = dis(gen);
+    return String(code);
+}
+
 struct Settings {
     char email[60];
     char password[20];
-    char pairingCode[4];
+    char pairingCode[5];
 } settings;
 
 FireBaseManager firebaseManager;
@@ -86,22 +97,25 @@ void setup() {
 
         WiFiManager wm;
 
+        String pairingCode = PairingCodeGenerator();
+        pairingCode.toCharArray(settings.pairingCode, sizeof(settings.pairingCode));
+
         settings.password[19] = '\0';
         settings.email[59] = '\0';
 
         WiFiManagerParameter email_parameter("email", "Email", settings.email, 60);
         WiFiManagerParameter password_parameter("password", "Password", settings.password, 20, "type='password'");
-        WiFiManagerParameter pairingCode_parameter("pairingCode", "Pairing Code", settings.pairingCode, 4, "type='number'");
+        WiFiManagerParameter custom_pairing_code_text("pairing_code", "Seu codigo de pareamento é: ", settings.pairingCode, 4);
 
         wm.addParameter(&email_parameter);
         wm.addParameter(&password_parameter);
-        wm.addParameter(&pairingCode_parameter);
+        wm.addParameter(&custom_pairing_code_text);
+        wm.setCustomHeadElement(customHtmlHeader);
 
         wm.startConfigPortal("AquaNet");
 
         strcpy(settings.email, email_parameter.getValue());
         strcpy(settings.password, password_parameter.getValue());
-        strcpy(settings.pairingCode, pairingCode_parameter.getValue());
 
         EEPROM.put(0, settings);
         if (EEPROM.commit()) {
