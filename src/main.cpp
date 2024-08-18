@@ -23,7 +23,6 @@ unsigned long previousMillis = 0;
 unsigned long lastFirebaseOperation = 0;
 const unsigned long interval = 1000;
 const unsigned long firebaseInterval = 5000;
-const char* customHtmlHeader = "<style>#pairing_code { text-align: center; font-size: 3rem; border: none; padding: 15px; width: 100%; box-sizing: border-box; } </style>";
 
 class FireBaseManager {
 private:
@@ -42,7 +41,7 @@ void ConnectToWifi() {
         if (WiFi.waitForConnectResult() == WL_CONNECTED) {
             connected = true;
             Serial.println("Wi-Fi connected");
-        }   
+        }
         if (WiFi.status() != WL_CONNECTED) {
             Serial.println("Wi-Fi connection failed");
         }
@@ -50,9 +49,9 @@ void ConnectToWifi() {
 }
 
 String PairingCodeGenerator() {
-    std::random_device rd;  
-    std::mt19937 gen(rd()); 
-    std::uniform_int_distribution<> dis(1000, 9999); 
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(1000, 9999);
 
     int code = dis(gen);
     return String(code);
@@ -105,12 +104,9 @@ void setup() {
 
         WiFiManagerParameter email_parameter("email", "Email", settings.email, 60);
         WiFiManagerParameter password_parameter("password", "Password", settings.password, 20, "type='password'");
-        WiFiManagerParameter custom_pairing_code_text("pairing_code", "Seu codigo de pareamento é: ", settings.pairingCode, 4);
 
         wm.addParameter(&email_parameter);
         wm.addParameter(&password_parameter);
-        wm.addParameter(&custom_pairing_code_text);
-        wm.setCustomHeadElement(customHtmlHeader);
 
         wm.startConfigPortal("AquaNet");
 
@@ -120,11 +116,11 @@ void setup() {
         EEPROM.put(0, settings);
         if (EEPROM.commit()) {
             Serial.println("Settings saved to EEPROM");
-        } 
+        }
         if (!EEPROM.commit()) {
             Serial.println("Error saving settings to EEPROM");
         }
-    } 
+    }
 
     Serial.println("Starting the device");
     ConnectToWifi();
@@ -178,7 +174,10 @@ void loop() {
         json.set("LEVEL", count++);
         json.set("timestamp", currentMillis);
 
-        String path = "/UsersData/" + String(settings.pairingCode);
+        String path = "/UsersData/";
+        path += auth.token.uid.c_str();
+        path += "/";
+        path += settings.pairingCode;
         if (Firebase.RTDB.setJSON(&fbdo, path, &json)) {
             Serial.println("Data sent successfully");
         }
