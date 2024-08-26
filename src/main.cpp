@@ -63,7 +63,6 @@ struct Settings {
   char email[60];
   char password[20];
   char DeviceUniqueId[5];
-  char DeviceUniqueName[20];
 } settings;
 
 FireBaseManager firebaseManager;
@@ -109,7 +108,6 @@ void setup() {
     WiFiManagerParameter email_parameter("email", "Email", settings.email, 60);
     WiFiManagerParameter password_parameter(
         "password", "Password", settings.password, 20, "type='password'");
-    WiFiManagerParameter device_name_parameter("name", "Device name", settings.DeviceUniqueName, 20);
 
     wm.addParameter(&email_parameter);
     wm.addParameter(&password_parameter);
@@ -119,7 +117,6 @@ void setup() {
 
     strcpy(settings.email, email_parameter.getValue());
     strcpy(settings.password, password_parameter.getValue());
-    strcpy(settings.DeviceUniqueName, device_name_parameter.getValue());
 
     EEPROM.put(0, settings);
     if (EEPROM.commit()) {
