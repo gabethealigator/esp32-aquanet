@@ -1,3 +1,9 @@
+/* 
+  TODOS: Add the multicolored leds indicating the status like
+  reconecting to wifi, waiting wifi response, connected sucessfuly, sending data, waiting for the input
+  to enter setup mode, etc.
+*/
+
 #include "esp_system.h"
 #include <Arduino.h>
 #include <EEPROM.h>
@@ -62,7 +68,7 @@ String GetDeviceUniqueId() {
 struct Settings {
   char email[60];
   char password[20];
-  char DeviceUniqueId[5];
+  char DeviceUniqueId[7];
 } settings;
 
 FireBaseManager firebaseManager;
@@ -87,6 +93,7 @@ void setup() {
   Serial.println("Settings loaded from EEPROM");
 
   if (digitalRead(SETUP_PIN) == LOW) {
+    SetupMode:
     Serial.println("Entering setup mode");
 
     for (int i = 0; i < 2; i++) {
@@ -111,7 +118,6 @@ void setup() {
 
     wm.addParameter(&email_parameter);
     wm.addParameter(&password_parameter);
-    wm.addParameter(&device_name_parameter);
 
     wm.startConfigPortal("AquaNet");
 
@@ -127,8 +133,12 @@ void setup() {
     }
   }
 
-  Serial.println("Starting the device");
+  Serial.println("Starting the device...");
   ConnectToWifi();
+
+  if (WiFi.status() != WL_CONNECTED) {
+    goto SetupMode;
+  }
 
   config.api_key = API_KEY;
   config.database_url = DATABASE_URL;
