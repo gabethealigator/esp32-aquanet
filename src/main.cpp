@@ -5,17 +5,23 @@
 #include <WiFiManager.h>
 #include <addons/RTDBHelper.h>
 #include <addons/TokenHelper.h>
+#include <DallasTemperature.h>
+#include <OneWire.h>
 
 #define API_KEY "AIzaSyBhj3If5etw9wk-QXnNnU0vvRxBKk2syFw"
 #define DATABASE_URL "https://site-aqua-54d76-default-rtdb.firebaseio.com"
 
 #define SETUP_PIN 0
 #define LED 2
+#define ONE_WIRE_BUS 4
 
 FirebaseData fbdo;
 FirebaseData fbdoStream;
 FirebaseAuth auth;
 FirebaseConfig config;
+
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature sensors(&oneWire);
 
 int count = 0;
 bool connected = false;
@@ -57,6 +63,7 @@ struct Settings {
   char email[60];
   char password[20];
   char DeviceUniqueId[5];
+  char DeviceUniqueName[20];
 } settings;
 
 FireBaseManager firebaseManager;
@@ -102,14 +109,17 @@ void setup() {
     WiFiManagerParameter email_parameter("email", "Email", settings.email, 60);
     WiFiManagerParameter password_parameter(
         "password", "Password", settings.password, 20, "type='password'");
+    WiFiManagerParameter device_name_parameter("name", "Device name", settings.DeviceUniqueName, 20);
 
     wm.addParameter(&email_parameter);
     wm.addParameter(&password_parameter);
+    wm.addParameter(&device_name_parameter);
 
     wm.startConfigPortal("AquaNet");
 
     strcpy(settings.email, email_parameter.getValue());
     strcpy(settings.password, password_parameter.getValue());
+    strcpy(settings.DeviceUniqueName, device_name_parameter.getValue());
 
     EEPROM.put(0, settings);
     if (EEPROM.commit()) {
@@ -147,6 +157,8 @@ void setup() {
   Firebase.RTDB.beginStream(&fbdoStream,
                             "/UsersData/" + String(settings.DeviceUniqueId));
 
+  sensors.begin();
+
   Serial.printf("Firebase Client v%s\n\n", FIREBASE_CLIENT_VERSION);
   Serial.println("Email: " + String(settings.email));
   Serial.println("Password: " + String(settings.password));
@@ -155,6 +167,8 @@ void setup() {
 
 void loop() {
   unsigned long currentMillis = millis();
+  sensors.requestTemperatures();
+  float temperatureC = sensors.getTempCByIndex(0);
 
   if (WiFi.status() != WL_CONNECTED) {
     ConnectToWifi();
@@ -170,7 +184,7 @@ void loop() {
     lastFirebaseOperation = currentMillis;
 
     FirebaseJson json;
-    json.set("TEMP", count++);
+    json.set("TEMP", temperatureC);
     json.set("PH", count++);
     json.set("LEVEL", count++);
     json.set("timestamp", currentMillis);
