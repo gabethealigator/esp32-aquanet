@@ -1,7 +1,7 @@
 /* 
   TODOS: Add the multicolored leds indicating the status like
   reconecting to wifi, waiting wifi response, connected sucessfuly, sending data, waiting for the input
-  to enter setup mode, etc.
+  to enter setup mode, etc. 12 echo 13 trigger
 */
 
 #include "esp_system.h"
@@ -21,6 +21,10 @@
 #define LED 2
 #define ONE_WIRE_BUS 4
 
+#define TRIGGER_PIN 13
+#define ECHO_PIN 12
+#define SOUND_SPEED 0.034
+
 FirebaseData fbdo;
 FirebaseData fbdoStream;
 FirebaseAuth auth;
@@ -35,6 +39,8 @@ unsigned long previousMillis = 0;
 unsigned long lastFirebaseOperation = 0;
 const unsigned long interval = 1000;
 const unsigned long firebaseInterval = 5000;
+long duration;
+float distanceCm;
 
 class FireBaseManager {
 private:
@@ -77,6 +83,8 @@ void setup() {
   Serial.begin(9600);
   WiFi.mode(WIFI_STA);
   pinMode(LED, OUTPUT);
+  pinMode(TRIGGER_PIN, OUTPUT);
+  pinMode(ECHO_PIN, INPUT);
 
   Serial.println("Press the button to enter setup mode");
   for (int i = 3; i > 0; i--) {
@@ -173,9 +181,19 @@ void setup() {
 }
 
 void loop() {
-  unsigned long currentMillis = millis();
   sensors.requestTemperatures();
+  unsigned long currentMillis = millis();
   float temperatureC = sensors.getTempCByIndex(0);
+
+  digitalWrite(TRIGGER_PIN, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIGGER_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIGGER_PIN, LOW);
+
+  duration = pulseIn(ECHO_PIN, HIGH);
+
+  distanceCm = duration * SOUND_SPEED / 2;
 
   if (WiFi.status() != WL_CONNECTED) {
     ConnectToWifi();
@@ -193,7 +211,7 @@ void loop() {
     FirebaseJson json;
     json.set("TEMP", temperatureC);
     json.set("PH", count++);
-    json.set("LEVEL", count++);
+    json.set("LEVEL", distanceCm);
     json.set("timestamp", currentMillis);
 
     String path = "/UsersData/";
