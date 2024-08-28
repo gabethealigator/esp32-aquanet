@@ -198,8 +198,9 @@ void loop() {
 
     String path = "/UsersData/";
     path += auth.token.uid.c_str();
-    path += "/";
+    path += "/modules/";
     path += settings.DeviceUniqueId;
+    path += "/statistics";
     if (Firebase.RTDB.setJSON(&fbdo, path, &json)) {
       Serial.println("Data sent successfully");
     }
