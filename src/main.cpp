@@ -1,9 +1,3 @@
-/* 
-  TODOS: Add the multicolored leds indicating the status like
-  reconecting to wifi, waiting wifi response, connected sucessfuly, sending data, waiting for the input
-  to enter setup mode, etc. 12 echo 13 trigger
-*/
-
 #include "esp_system.h"
 #include <Arduino.h>
 #include <EEPROM.h>
@@ -24,6 +18,7 @@
 #define TRIGGER_PIN 13
 #define ECHO_PIN 12
 #define SOUND_SPEED 0.034
+#define TURBIDITY_PIN 35
 
 FirebaseData fbdo;
 FirebaseData fbdoStream;
@@ -52,6 +47,12 @@ public:
     return signupOK;
   }
 };
+
+float ArredondarVoltagem(float ValorEntrada, int CasaDecimal) {
+    float multiplicador = powf(10.0f, CasaDecimal);
+    ValorEntrada = roundf(ValorEntrada * multiplicador) / multiplicador;
+    return ValorEntrada;
+}
 
 void ConnectToWifi() {
   if (WiFi.status() != WL_CONNECTED) {
@@ -185,6 +186,19 @@ void loop() {
   unsigned long currentMillis = millis();
   float temperatureC = sensors.getTempCByIndex(0);
 
+  int turbidityValue = analogRead(TURBIDITY_PIN);
+
+  float voltage = 0;
+  float convertedVoltage = 0;
+
+  for (int i = 0; i < 800; i++) {
+      turbidityValue = analogRead(35);  
+      voltage += (float(turbidityValue) / 4095) * 5;  
+  }
+
+  voltage = voltage / 800;
+  convertedVoltage = ArredondarVoltagem(voltage, 1);  
+
   digitalWrite(TRIGGER_PIN, LOW);
   delayMicroseconds(2);
   digitalWrite(TRIGGER_PIN, HIGH);
@@ -210,7 +224,8 @@ void loop() {
 
     FirebaseJson json;
     json.set("TEMP", temperatureC);
-    json.set("PH", count++);
+    json.set("TURBIDITY", convertedVoltage);
+    json.set("PH", 7);
     json.set("LEVEL", distanceCm);
     json.set("timestamp", currentMillis);
 
