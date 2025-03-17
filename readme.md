@@ -1,136 +1,132 @@
+# ESP32-AquaNet
 
-# ESP32 AquaNet
+## Visão Geral
 
-ESP32 AquaNet is a project aimed at creating a networked system for monitoring and controlling aquatic environments using an ESP32 microcontroller. This project is developed as part of the final project (TCC) for the Systems Development course.
+O **ESP32-AquaNet** é o componente de hardware do ecossistema do AQUA Project, desenvolvido para monitorar e coletar dados em tempo real de aquários. Este repositório contém o firmware e as especificações de hardware para o sistema de monitoramento baseado em ESP32, integrado ao [Aplicativo Web AQUA](https://github.com/gabethealigator/aqua-project).
 
-## Table of Contents
+## Objetivo
 
-- [Introduction](#introduction)
-- [Hardware Requirements](#hardware-requirements)
-- [Software Requirements](#software-requirements)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Code Structure](#code-structure)
-- [Code Explanation](#code-explanation)
-- [Usage](#usage)
-- [Contributing](#contributing)
-- [License](#license)
+Este projeto foi desenvolvido como parte de um **TCC** (Trabalho de Conclusão de Curso) com o intuito de criar uma solução completa para entusiastas e profissionais de aquários. O ESP32-AquaNet atua como o módulo de coleta e transmissão de dados, fornecendo informações ao principal aplicativo web do AQUA Project.
 
-## Introduction
+## Funcionalidades
 
-The ESP32 AquaNet project utilizes the ESP32 microcontroller to monitor and control various aspects of an aquatic environment. The system is designed to be highly configurable and extendable, allowing users to tailor it to their specific needs.
+- **Monitoramento em Tempo Real**: Coleta dados simultaneamente de múltiplos sensores
+- **Conectividade Sem Fio**: Transmite os dados para o aplicativo web via Wi-Fi
+- **Baixo Consumo de Energia**: Otimizado para operação prolongada
+- **Suporte a Múltiplos Sensores**:
+  - Sensor de pH
+  - Sensor de temperatura da água
+  - Sensor de turbidez
+  - Sensor de nível da água
+- **Transmissão Automática de Dados**: Envia regularmente os dados para o aplicativo web
+- **Operação Autônoma**: Funciona de forma independente com uma configuração mínima
 
-## Hardware Requirements
+## Requisitos de Hardware
 
-- ESP32 Development Board
-- Sensors (e.g., temperature, pH, turbidity)
-- Actuators (e.g., pumps, lights)
-- Power supply
-- Breadboard and jumper wires
+- Placa com microcontrolador ESP32
+- Módulo sensor de pH
+- Sensor de temperatura DS18B20 à prova d'água
+- Sensor de turbidez
+- Sensor de nível da água
+- Protoboard ou PCB para montagem
+- Fios de conexão (jumper wires)
+- Fonte de alimentação (USB ou bateria)
+- Caixa à prova d'água (recomendado)
 
-## Software Requirements
+## Requisitos de Software
 
-- Arduino IDE or PlatformIO
-- ESP32 board support in Arduino IDE/PlatformIO
-- Required libraries (listed in `platformio.ini` or `lib` directory)
+- Arduino IDE ou PlatformIO
+- Suporte para placas ESP32 na IDE escolhida
+- Bibliotecas necessárias:
+  - WiFi.h
+  - HTTPClient.h
+  - ArduinoJson.h
+  - OneWire.h
+  - DallasTemperature.h
+  - (Outras bibliotecas específicas para cada sensor)
 
-## Installation
+## Instalação e Configuração
 
-### Arduino IDE
+### Configuração do Ambiente de Desenvolvimento
 
-1. Install the Arduino IDE.
-2. Add ESP32 board support through the Board Manager.
-3. Clone this repository and open the project in Arduino IDE.
-4. Install the required libraries listed in `platformio.ini` or the `lib` directory.
+1. Instale o Arduino IDE ou PlatformIO.
+2. Adicione o suporte para placas ESP32 na sua IDE.
+3. Instale as bibliotecas necessárias através do gerenciador de bibliotecas.
 
-### PlatformIO
+### Montagem do Hardware
 
-1. Install Visual Studio Code.
-2. Install the PlatformIO extension.
-3. Clone this repository and open it in PlatformIO.
-4. PlatformIO will automatically install the required libraries.
+1. Conecte os sensores ao ESP32 conforme a configuração de pinos definida no código.
+2. Garanta uma fonte de alimentação adequada para todos os componentes.
+3. Posicione os sensores em locais apropriados dentro do aquário.
 
-## Configuration
+### Instalação do Firmware
 
-Before uploading the code to your ESP32, configure the following parameters:
+1. Clone este repositório:
+   ```
+   git clone https://github.com/yourusername/esp32-aquanet.git
+   cd esp32-aquanet
+   ```
 
-1. WiFi credentials
-2. Sensor and actuator pins
-3. Other customizable settings as needed
+2. Abra o projeto na sua IDE.
 
-## Code Structure
+3. Configure as credenciais de Wi-Fi e as informações do servidor no arquivo `config.h`:
+   ```cpp
+   // Substitua pelas credenciais da sua rede Wi-Fi
+   #define WIFI_SSID "YourWiFiSSID"
+   #define WIFI_PASSWORD "YourWiFiPassword"
 
-The project is organized into the following directories:
+   // Substitua pela URL do seu servidor do AQUA Project
+   #define SERVER_URL "http://your-aqua-server.com/api/readings"
+   ```
 
-- `include`: Header files for the project
-- `lib`: External libraries used in the project
-- `src`: Source code files
-- `test`: Test files for the project
+4. Faça o upload do firmware para a placa ESP32.
 
-Key files:
+## Integração com o Aplicativo Web AQUA
 
-- `src/main.cpp`: The main entry point for the project
-- `platformio.ini`: PlatformIO configuration file
+Este componente de hardware foi projetado para funcionar de forma integrada com o [Aplicativo Web AQUA](https://github.com/gabethealigator/aqua-project). O ESP32-AquaNet coleta os dados dos sensores e os transmite para o aplicativo web, onde podem ser visualizados, analisados e utilizados para o envio de notificações.
 
-## Code Explanation
+Para configurar o sistema completo:
 
-The main code file `src/main.cpp` handles the setup and loop functions essential for the ESP32 operation.
+1. Configure o Aplicativo Web AQUA conforme as instruções do seu repositório.
+2. Ajuste o ESP32-AquaNet com a URL correta do servidor.
+3. Registre o dispositivo no aplicativo web.
+4. Comece a monitorar o seu aquário em tempo real.
 
-### LED Indications
+## Diagrama de Circuito
 
-- **Initial Setup Prompt**: The LED blinks once every second for 3 seconds, prompting the user to press the setup button if they want to enter setup mode.
-- **Entering Setup Mode**: If the setup button is pressed, the LED blinks twice rapidly to indicate that the setup mode has been activated.
-- **WiFi Connection Status**: Once the device attempts to connect to WiFi, if successful, the LED blinks every 4 seconds to indicate a successful connection.
+Um diagrama detalhado de circuito está disponível no diretório `docs/`, demonstrando como conectar todos os sensores ao microcontrolador ESP32.
 
-### Custom Parameter Classes Examples
+## Estrutura do Código
 
-Three custom parameter classes are defined to handle different types of parameters:
+- `esp32-aquanet.ino`: Arquivo principal do sketch Arduino.
+- `config.h`: Arquivo com as configurações de Wi-Fi e do servidor.
+- `sensors.h`: Funções de inicialização e leitura dos sensores.
+- `network.h`: Funções de conexão de rede e transmissão de dados.
 
-#### IPAddressParameter
+## Solução de Problemas
 
-Handles IP address parameters.
+- **Problemas na Leitura dos Sensores**: Certifique-se de calibrar corretamente os sensores antes da implantação.
+- **Problemas de Conexão**: Verifique as credenciais do Wi-Fi e a URL do servidor.
+- **Problemas de Alimentação**: Cheque a tensão e a capacidade da fonte de alimentação.
+- **Erros na Transmissão de Dados**: Garanta que o formato dos dados enviados seja compatível com o que o servidor espera.
 
-#### IntParameter
+## Melhorias Futuras
 
-Handles integer parameters.
+- Adicionar suporte para tipos adicionais de sensores.
+- Implementar armazenamento local para operação offline.
+- Desenvolver recursos de gerenciamento de energia para operação com bateria.
+- Criar um aplicativo móvel para conexão direta com o dispositivo.
+- Adicionar recursos de calibração automática dos sensores.
 
-#### FloatParameter
+## Contribuindo
 
-Handles float parameters.
+Contribuições para aprimorar o ESP32-AquaNet são muito bem-vindas! Sinta-se à vontade para enviar um Pull Request.
 
-### Settings Structure
+## Agradecimentos
 
-A structure to hold various configuration settings:
+- Agradecimento especial a todos os colaboradores e orientadores que apoiaram o desenvolvimento deste projeto de TCC.
+- Gratidão às comunidades ESP32 e Arduino, pelas excelentes documentações e suporte.
 
-```cpp
-struct Settings
-{
-  float f;
-  int i;
-  char s[20];
-  uint32_t ip;
-} sett;
-```
+## Projetos Relacionados
 
-### Setup Function
-
-The `setup` function initializes the WiFi mode, sets up pin modes, and reads saved settings from EEPROM. It checks if the setup button is pressed to enter the configuration portal where WiFi credentials and custom parameters can be set.
-
-### Loop Function
-
-The `loop` function continuously checks the WiFi connection status and blinks the LED based on the connection status.
-
-## Usage
-
-1. Connect the hardware components as described in the Hardware Requirements section.
-2. Configure the software as described in the Configuration section.
-3. Upload the code to the ESP32.
-4. Monitor and control your aquatic environment using the ESP32.
-
-## Contributing
-
-Contributions are welcome! Please fork the repository and submit a pull request with your improvements.
-
-## License
-
-This project is licensed under the MIT License. See the LICENSE file for details.
+- [Aplicativo Web AQUA](https://github.com/gabethealigator/aqua-project) - Componente web deste ecossistema
